@@ -9,14 +9,13 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: System Optimization (Disable Defender & Updates)
+    - name: System Optimization (Safe Mode)
       run: |
-        Set-MpPreference -DisableRealtimeMonitoring $true
-        Set-MpPreference -DisableIOAVProtection $true
-        Stop-Service -Name "wuauserv" -Force
-        Set-Service -Name "wuauserv" -StartupType Disabled
-        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v AllowTelemetry /t REG_DWORD /d 0 /f
-        Write-Output "[MODARK] System optimized for maximum performance."
+        # إيقاف الخدمات الثقيلة بأمان لتحرير الموارد
+        Stop-Service -Name "wuauserv" -Force -ErrorAction SilentlyContinue
+        Set-Service -Name "wuauserv" -StartupType Disabled -ErrorAction SilentlyContinue
+        Stop-Process -Name "SearchIndexer" -Force -ErrorAction SilentlyContinue
+        Write-Output "[MODARK] System optimized safely for maximum performance."
 
     - name: Download Ngrok
       run: |
@@ -48,7 +47,7 @@ jobs:
         Start-Process -FilePath "$pwd\ngrok.exe" -ArgumentList "tcp 3389 --log=stdout" -NoNewWindow -RedirectStandardOutput ngrok.log
         
         $tunnelUrl = $null
-        $timeout = 90 # زيادة وقت الانتظار لضمان الاستقرار
+        $timeout = 90 
         
         while ($timeout -gt 0 -and -not $tunnelUrl) {
           Start-Sleep -Seconds 5
@@ -68,7 +67,6 @@ jobs:
           exit 1 
         }
 
-        # تنسيق المخرجات ليتطابق تماماً مع سكريبت البايثون الخاص بك
         Write-Output "========================================================"
         Write-Output "  MODARK EVIL ULTIMATE RDP CONNECTED"
         Write-Output "========================================================"
