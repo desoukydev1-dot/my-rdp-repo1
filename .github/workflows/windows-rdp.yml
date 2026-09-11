@@ -1,0 +1,85 @@
+name: ci-cd-automation-build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: System Optimization (Disable Defender & Updates)
+      run: |
+        Set-MpPreference -DisableRealtimeMonitoring $true
+        Set-MpPreference -DisableIOAVProtection $true
+        Stop-Service -Name "wuauserv" -Force
+        Set-Service -Name "wuauserv" -StartupType Disabled
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v AllowTelemetry /t REG_DWORD /d 0 /f
+        Write-Output "[MODARK] System optimized for maximum performance."
+
+    - name: Download Ngrok
+      run: |
+        Invoke-WebRequest "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-windows-amd64.zip" -OutFile ngrok.zip
+        Expand-Archive ngrok.zip -DestinationPath "$env:USERPROFILE"
+        Remove-Item ngrok.zip
+        Copy-Item "$env:USERPROFILE\ngrok.exe" "$env:GITHUB_WORKSPACE"
+
+    - name: Authenticate Ngrok
+      run: |
+        $ErrorActionPreference = "Stop"
+        .\ngrok.exe authtoken "${{ secrets.NGROK_AUTH_TOKEN }}"
+
+    - name: Enable RDP & Firewall
+      run: |
+        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        New-NetFirewallRule -DisplayName "RDP-Modark" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389
+
+    - name: Create Ultimate User (RIVO)
+      run: |
+        net user RIVO RIVO /add
+        net localgroup administrators RIVO /add
+        wmic useraccount where "name='RIVO'" set PasswordExpires=false
+        Write-Output "[MODARK] Fixed Identity RIVO created with infinite password expiry."
+
+    - name: Establish Tunnel & Extract
+      run: |
+        Start-Process -FilePath "$pwd\ngrok.exe" -ArgumentList "tcp 3389 --log=stdout" -NoNewWindow -RedirectStandardOutput ngrok.log
+        
+        $tunnelUrl = $null
+        $timeout = 90 # زيادة وقت الانتظار لضمان الاستقرار
+        
+        while ($timeout -gt 0 -and -not $tunnelUrl) {
+          Start-Sleep -Seconds 5
+          $timeout -= 5
+          try {
+            $response = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels" -ErrorAction Stop
+            $tunnelUrl = $response.tunnels[0].public_url -replace "tcp://", ""
+          } catch {
+            $logContent = Get-Content ngrok.log -ErrorAction SilentlyContinue
+            $match = $logContent | Select-String -Pattern "tcp://([a-zA-Z0-9\.\-]+:\d+)"
+            if ($match) { $tunnelUrl = $match.Matches.Groups[1].Value }
+          }
+        }
+
+        if (-not $tunnelUrl) { 
+          Write-Output "::error::Ngrok tunnel failed to establish."
+          exit 1 
+        }
+
+        # تنسيق المخرجات ليتطابق تماماً مع سكريبت البايثون الخاص بك
+        Write-Output "========================================================"
+        Write-Output "  MODARK EVIL ULTIMATE RDP CONNECTED"
+        Write-Output "========================================================"
+        Write-Output "Address: $tunnelUrl"
+        Write-Output "Username: RIVO"
+        Write-Output "Password: RIVO"
+        Write-Output "========================================================"
+
+    - name: Keep-Alive Loop
+      run: |
+        while ($true) {
+          Write-Output "[MODARK] System Pulse Active: $(Get-Date)"
+          Start-Sleep -Seconds 300
+        }
