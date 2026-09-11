@@ -38,13 +38,10 @@ jobs:
 
     - name: Create Ultimate User (RIVO) - FINAL FIX
       run: |
-        # كلمة مرور قوية لا تحتوي على اسم المستخدم RIVO
-        $securePassword = ConvertTo-SecureString "ModarkEvil@2026!" -AsPlainText -Force
+        # كلمة مرور قوية لا تحتوي على 3 حروف متتالية من اسم المستخدم RIVO
+        $securePassword = ConvertTo-SecureString "Desouky@2026!" -AsPlainText -Force
         
-        # إنشاء المستخدم
         New-LocalUser -Name "RIVO" -Password $securePassword -FullName "Modark User" -Description "Ultimate RDP User" -PasswordNeverExpires
-        
-        # إضافة للمسؤولين
         Add-LocalGroupMember -Group "Administrators" -Member "RIVO"
         
         Write-Output "[MODARK] User RIVO created successfully with admin rights."
@@ -79,7 +76,7 @@ jobs:
         Write-Output "========================================================"
         Write-Output "Address: $tunnelUrl"
         Write-Output "Username: RIVO"
-        Write-Output "Password: ModarkEvil@2026!"
+        Write-Output "Password: Desouky@2026!"
         Write-Output "========================================================"
 
     - name: Keep-Alive Loop
