@@ -9,13 +9,12 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: System Optimization (Safe Mode)
+    - name: System Optimization
       run: |
-        # إيقاف الخدمات الثقيلة بأمان لتحرير الموارد
         Stop-Service -Name "wuauserv" -Force -ErrorAction SilentlyContinue
         Set-Service -Name "wuauserv" -StartupType Disabled -ErrorAction SilentlyContinue
         Stop-Process -Name "SearchIndexer" -Force -ErrorAction SilentlyContinue
-        Write-Output "[MODARK] System optimized safely for maximum performance."
+        Write-Output "[MODARK] System optimized."
 
     - name: Download Ngrok
       run: |
@@ -28,19 +27,27 @@ jobs:
       run: |
         $ErrorActionPreference = "Stop"
         .\ngrok.exe authtoken "${{ secrets.NGROK_AUTH_TOKEN }}"
+        Write-Output "[MODARK] Ngrok authenticated."
 
     - name: Enable RDP & Firewall
       run: |
         Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
         New-NetFirewallRule -DisplayName "RDP-Modark" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389
+        Write-Output "[MODARK] RDP enabled."
 
-    - name: Create Ultimate User (RIVO)
+    - name: Create Ultimate User (RIVO) - FIXED
       run: |
-        net user RIVO RIVO /add
-        net localgroup administrators RIVO /add
-        wmic useraccount where "name='RIVO'" set PasswordExpires=false
-        Write-Output "[MODARK] Fixed Identity RIVO created with infinite password expiry."
+        # كلمة مرور معقدة تلبي سياسة ويندوز
+        $securePassword = ConvertTo-SecureString "RIVO@2026!" -AsPlainText -Force
+        
+        # إنشاء المستخدم
+        New-LocalUser -Name "RIVO" -Password $securePassword -FullName "Modark User" -Description "Ultimate RDP User" -PasswordNeverExpires
+        
+        # إضافة للمسؤولين
+        Add-LocalGroupMember -Group "Administrators" -Member "RIVO"
+        
+        Write-Output "[MODARK] User RIVO created with complex password and admin rights."
 
     - name: Establish Tunnel & Extract
       run: |
@@ -63,7 +70,7 @@ jobs:
         }
 
         if (-not $tunnelUrl) { 
-          Write-Output "::error::Ngrok tunnel failed to establish."
+          Write-Output "::error::Ngrok tunnel failed."
           exit 1 
         }
 
@@ -72,12 +79,12 @@ jobs:
         Write-Output "========================================================"
         Write-Output "Address: $tunnelUrl"
         Write-Output "Username: RIVO"
-        Write-Output "Password: RIVO"
+        Write-Output "Password: RIVO@2026!"
         Write-Output "========================================================"
 
     - name: Keep-Alive Loop
       run: |
         while ($true) {
-          Write-Output "[MODARK] System Pulse Active: $(Get-Date)"
+          Write-Output "[MODARK] Pulse: $(Get-Date)"
           Start-Sleep -Seconds 300
         }
